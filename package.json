@@ -1,0 +1,28 @@
+{
+  "name": "cuert_task",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MohamedAmir133/Cuert_Task.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/MohamedAmir133/Cuert_Task/issues"
+  },
+  "homepage": "https://github.com/MohamedAmir133/Cuert_Task#readme",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "pg": "^8.16.3",
+    "typeorm": "^0.3.28"
+  }
+}
