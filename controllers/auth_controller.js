@@ -23,7 +23,7 @@ export const withoutPassword = (user) => {
 export const hashPassword = (password) => bcrypt.hash(password, saltRounds);
 
 export const signToken = (user) => {
-    const secret = process.env.JWT_SECRET || "development-only-jwt-secret";
+    const secret = process.env.JWT_SECRET || "blablablablablablablabla";
     return jwt.sign({ userId: user.id, email: user.email }, secret, {
         expiresIn: process.env.JWT_EXPIRES_IN || "1d",
     });

@@ -13,4 +13,3 @@ router.route("/").get(getTasks).post(createTask);
 router.route("/:id").get(getTaskById).patch(updateTask).delete(deleteTask);
 
 export default router;
-

@@ -13,4 +13,3 @@ router.route("/").get(getProjects).post(createProject);
 router.route("/:id").get(getProjectById).patch(updateProject).delete(deleteProject);
 
 export default router;
-

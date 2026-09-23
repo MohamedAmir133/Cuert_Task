@@ -35,6 +35,7 @@ export const ProjectSchema = new EntitySchema({
         members: {
             type: "many-to-many",
             target: "User",
+            inverseSide: "projects",
             joinTable: true,
         },
         tasks: {

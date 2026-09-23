@@ -11,6 +11,7 @@ export const AppDataSource = new DataSource({
     username: process.env.DB_USERNAME || "postgres",
     password: process.env.DB_PASSWORD || "postgres",
     database: process.env.DB_NAME || "cuert_task",
+    ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
     synchronize: process.env.DB_SYNC !== "false", // to make sure the database schema is in sync with the entities, set this to true in development, but false in production
     logging: false, // to print all the queries in the console, set this to true
     entities: [UserSchema, ProjectSchema, TaskSchema],
