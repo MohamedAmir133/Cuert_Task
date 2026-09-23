@@ -7,6 +7,7 @@ import {
 } from "../dtos/task_dto.js";
 import { hasValidationErrors, isPositiveInteger } from "../dtos/shared_dto.js";
 import { sendError, sendSuccess } from "../utils/responses.js";
+import { sanitizeTask } from "../utils/sanitize.js";
 
 const taskRepository = () => AppDataSource.getRepository("Task");
 const projectRepository = () => AppDataSource.getRepository("Project");
@@ -72,7 +73,7 @@ export const createTask = async (req, res) => {
     const task = taskRepository().create(mapCreateTaskDto(req.body, project, assignee));
 
     const savedTask = await taskRepository().save(task);
-    return sendSuccess(res, 201, "Task created successfully.", savedTask);
+    return sendSuccess(res, 201, "Task created successfully.", sanitizeTask(savedTask));
 };
 
 export const getTasks = async (req, res) => {
@@ -111,7 +112,7 @@ export const getTasks = async (req, res) => {
     const [tasks, total] = await query.getManyAndCount();
 
     return sendSuccess(res, 200, "Tasks fetched successfully.", {
-        items: tasks,
+        items: tasks.map(sanitizeTask),
         pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
 };
@@ -133,7 +134,7 @@ export const getTaskById = async (req, res) => {
         return sendError(res, 403, "You do not have access to this task.");
     }
 
-    return sendSuccess(res, 200, "Task fetched successfully.", task);
+    return sendSuccess(res, 200, "Task fetched successfully.", sanitizeTask(task));
 };
 
 export const updateTask = async (req, res) => {
@@ -184,7 +185,7 @@ export const updateTask = async (req, res) => {
     Object.assign(task, mapUpdateTaskDto(req.body));
 
     const savedTask = await taskRepository().save(task);
-    return sendSuccess(res, 200, "Task updated successfully.", savedTask);
+    return sendSuccess(res, 200, "Task updated successfully.", sanitizeTask(savedTask));
 };
 
 export const deleteTask = async (req, res) => {

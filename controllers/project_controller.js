@@ -8,6 +8,7 @@ import {
 } from "../dtos/project_dto.js";
 import { hasValidationErrors, isPositiveInteger } from "../dtos/shared_dto.js";
 import { sendError, sendSuccess } from "../utils/responses.js";
+import { sanitizeProject } from "../utils/sanitize.js";
 
 const projectRepository = () => AppDataSource.getRepository("Project");
 const userRepository = () => AppDataSource.getRepository("User");
@@ -19,7 +20,7 @@ const addProjectProgress = (project) => {
     const doneTasks = tasks.filter((task) => task.status === "Done").length;
 
     return {
-        ...project,
+        ...sanitizeProject(project),
         progress: {
             totalTasks: tasks.length,
             doneTasks,
@@ -85,7 +86,7 @@ export const createProject = async (req, res) => {
     });
 
     const savedProject = await projectRepository().save(project);
-    return sendSuccess(res, 201, "Project created successfully.", savedProject);
+    return sendSuccess(res, 201, "Project created successfully.", sanitizeProject(savedProject));
 };
 
 export const getProjects = async (req, res) => {
