@@ -18,8 +18,9 @@ export const validateCreateTaskDto = (body) => {
         errors.projectId = "projectId is required and must be a positive project id.";
     }
 
-    if (body.assigneeId !== undefined && body.assigneeId !== null && !isPositiveInteger(body.assigneeId)) {
-        errors.assigneeId = "assigneeId must be a positive user id or null.";
+    const assignedTo = body.assignedTo ?? body.assigneeId;
+    if (assignedTo !== undefined && assignedTo !== null && !isPositiveInteger(assignedTo)) {
+        errors.assignedTo = "assignedTo must be a positive user id or null.";
     }
 
     if (body.status !== undefined && !TASK_STATUSES.includes(body.status)) {
@@ -48,8 +49,9 @@ export const validateUpdateTaskDto = (body) => {
         errors.projectId = "projectId must be a positive project id.";
     }
 
-    if (body.assigneeId !== undefined && body.assigneeId !== null && !isPositiveInteger(body.assigneeId)) {
-        errors.assigneeId = "assigneeId must be a positive user id or null.";
+    const assignedTo = body.assignedTo ?? body.assigneeId;
+    if (assignedTo !== undefined && assignedTo !== null && !isPositiveInteger(assignedTo)) {
+        errors.assignedTo = "assignedTo must be a positive user id or null.";
     }
 
     if (body.status !== undefined && !TASK_STATUSES.includes(body.status)) {
@@ -93,4 +95,3 @@ export const mapUpdateTaskDto = (body) => {
 
     return dto;
 };
-

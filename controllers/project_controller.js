@@ -1,4 +1,4 @@
-import { In } from "typeorm";
+import { Brackets, In } from "typeorm";
 import { AppDataSource } from "../libs/config/database.js";
 import {
     mapCreateProjectDto,
@@ -11,6 +11,8 @@ import { sendError, sendSuccess } from "../utils/responses.js";
 
 const projectRepository = () => AppDataSource.getRepository("Project");
 const userRepository = () => AppDataSource.getRepository("User");
+const defaultPage = 1;
+const defaultLimit = 10;
 
 const addProjectProgress = (project) => {
     const tasks = project.tasks || [];
@@ -35,6 +37,34 @@ const getMembersByIds = async (memberIds = []) => {
     return members;
 };
 
+const getPagination = (query) => {
+    const page = Number(query.page) > 0 ? Number(query.page) : defaultPage;
+    const limit = Number(query.limit) > 0 ? Math.min(Number(query.limit), 100) : defaultLimit;
+
+    return { page, limit, skip: (page - 1) * limit };
+};
+
+const isProjectMember = (project, userId) => {
+    return project.members?.some((member) => member.id === userId);
+};
+
+const canAccessProject = (project, userId) => {
+    return project.owner?.id === userId || isProjectMember(project, userId);
+};
+
+const findAccessibleProjectById = async (id, userId) => {
+    return projectRepository().findOne({
+        where: { id: Number(id) },
+        relations: { owner: true, members: true, tasks: true },
+    }).then((project) => {
+        if (!project) {
+            return { project: null, forbidden: false };
+        }
+
+        return { project, forbidden: !canAccessProject(project, userId) };
+    });
+};
+
 export const createProject = async (req, res) => {
     const errors = validateCreateProjectDto(req.body);
     if (hasValidationErrors(errors)) {
@@ -46,18 +76,47 @@ export const createProject = async (req, res) => {
         return sendError(res, 404, "One or more project members were not found.");
     }
 
-    const project = projectRepository().create(mapCreateProjectDto(req.body, members));
+    const memberMap = new Map(members.map((member) => [member.id, member]));
+    memberMap.set(req.user.id, req.user);
+
+    const project = projectRepository().create({
+        ...mapCreateProjectDto(req.body, [...memberMap.values()]),
+        owner: req.user,
+    });
 
     const savedProject = await projectRepository().save(project);
     return sendSuccess(res, 201, "Project created successfully.", savedProject);
 };
 
-export const getProjects = async (_req, res) => {
-    const projects = await projectRepository().find({
-        relations: { members: true, tasks: true },
-    });
+export const getProjects = async (req, res) => {
+    const { page, limit, skip } = getPagination(req.query);
+    const query = projectRepository()
+        .createQueryBuilder("project")
+        .leftJoinAndSelect("project.owner", "owner")
+        .leftJoinAndSelect("project.members", "member")
+        .leftJoinAndSelect("project.tasks", "task")
+        .where(
+            new Brackets((qb) => {
+                qb.where("owner.id = :userId", { userId: req.user.id })
+                    .orWhere("member.id = :userId", { userId: req.user.id });
+            }),
+        )
+        .orderBy("project.id", "ASC")
+        .skip(skip)
+        .take(limit);
 
-    return sendSuccess(res, 200, "Projects fetched successfully.", projects.map(addProjectProgress));
+    if (typeof req.query.name === "string" && req.query.name.trim() !== "") {
+        query.andWhere("LOWER(project.name) LIKE :name", {
+            name: `%${req.query.name.trim().toLowerCase()}%`,
+        });
+    }
+
+    const [projects, total] = await query.getManyAndCount();
+
+    return sendSuccess(res, 200, "Projects fetched successfully.", {
+        items: projects.map(addProjectProgress),
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
 };
 
 export const getProjectById = async (req, res) => {
@@ -65,13 +124,13 @@ export const getProjectById = async (req, res) => {
         return sendError(res, 400, "Project id must be a positive integer.");
     }
 
-    const project = await projectRepository().findOne({
-        where: { id: Number(req.params.id) },
-        relations: { members: true, tasks: true },
-    });
+    const { project, forbidden } = await findAccessibleProjectById(req.params.id, req.user.id);
 
     if (!project) {
         return sendError(res, 404, "Project not found.");
+    }
+    if (forbidden) {
+        return sendError(res, 403, "You do not have access to this project.");
     }
 
     return sendSuccess(res, 200, "Project fetched successfully.", addProjectProgress(project));
@@ -87,13 +146,13 @@ export const updateProject = async (req, res) => {
         return sendError(res, 400, "Validation failed.", errors);
     }
 
-    const project = await projectRepository().findOne({
-        where: { id: Number(req.params.id) },
-        relations: { members: true, tasks: true },
-    });
+    const { project, forbidden } = await findAccessibleProjectById(req.params.id, req.user.id);
 
     if (!project) {
         return sendError(res, 404, "Project not found.");
+    }
+    if (forbidden) {
+        return sendError(res, 403, "You do not have access to this project.");
     }
 
     Object.assign(project, mapUpdateProjectDto(req.body));
@@ -103,7 +162,9 @@ export const updateProject = async (req, res) => {
         if (members.length !== req.body.memberIds.length) {
             return sendError(res, 404, "One or more project members were not found.");
         }
-        project.members = members;
+        const memberMap = new Map(members.map((member) => [member.id, member]));
+        memberMap.set(project.owner.id, project.owner);
+        project.members = [...memberMap.values()];
     }
 
     const savedProject = await projectRepository().save(project);
@@ -115,9 +176,12 @@ export const deleteProject = async (req, res) => {
         return sendError(res, 400, "Project id must be a positive integer.");
     }
 
-    const project = await projectRepository().findOneBy({ id: Number(req.params.id) });
+    const { project, forbidden } = await findAccessibleProjectById(req.params.id, req.user.id);
     if (!project) {
         return sendError(res, 404, "Project not found.");
+    }
+    if (forbidden) {
+        return sendError(res, 403, "You do not have access to this project.");
     }
 
     await projectRepository().remove(project);

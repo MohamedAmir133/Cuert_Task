@@ -25,6 +25,13 @@ export const ProjectSchema = new EntitySchema({
         },
     },
     relations: {
+        owner: {
+            type: "many-to-one",
+            target: "User",
+            nullable: true,
+            onDelete: "CASCADE",
+            inverseSide: "ownedProjects",
+        },
         members: {
             type: "many-to-many",
             target: "User",

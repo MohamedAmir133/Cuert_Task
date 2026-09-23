@@ -1,8 +1,8 @@
 import { EntitySchema } from "typeorm";
 
 export const UserSchema = new EntitySchema({
-    name: "User",
-    tableName: "users",
+    name: "User", // The name of the entity
+    tableName: "users", // The name of the table in the database
     columns: {
         id: {
             primary: true,
@@ -33,6 +33,11 @@ export const UserSchema = new EntitySchema({
             type: "many-to-many",
             target: "Project",
             inverseSide: "members",
+        },
+        ownedProjects: {
+        type: "one-to-many",
+        target: "Project",
+        inverseSide: "owner", 
         },
         assignedTasks: {
             type: "one-to-many",
