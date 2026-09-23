@@ -6,17 +6,18 @@ import {
     validateUpdateUserDto,
 } from "../dtos/user_dto.js";
 import { hasValidationErrors, isPositiveInteger } from "../dtos/shared_dto.js";
+import { hashPassword, withoutPassword } from "./auth_controller.js";
 import { sendError, sendSuccess } from "../utils/responses.js";
 
 const userRepository = () => AppDataSource.getRepository("User");
+const defaultPage = 1;
+const defaultLimit = 10;
 
-const withoutPassword = (user) => {
-    if (!user) {
-        return user;
-    }
+const getPagination = (query) => {
+    const page = Number(query.page) > 0 ? Number(query.page) : defaultPage;
+    const limit = Number(query.limit) > 0 ? Math.min(Number(query.limit), 100) : defaultLimit;
 
-    const { password, ...safeUser } = user;
-    return safeUser;
+    return { page, limit, skip: (page - 1) * limit };
 };
 
 export const createUser = async (req, res) => {
@@ -31,18 +32,42 @@ export const createUser = async (req, res) => {
         return sendError(res, 409, "Email is already used.");
     }
 
-    const user = userRepository().create(dto);
+    const user = userRepository().create({
+        ...dto,
+        password: await hashPassword(dto.password),
+    });
     const savedUser = await userRepository().save(user);
 
     return sendSuccess(res, 201, "User created successfully.", withoutPassword(savedUser));
 };
 
-export const getUsers = async (_req, res) => {
-    const users = await userRepository().find({
-        relations: { projects: true, assignedTasks: true }, //to also show userdata with their projects and assigned tasks
-    });
+export const getUsers = async (req, res) => {
+    const { page, limit, skip } = getPagination(req.query);
+    const query = userRepository()
+        .createQueryBuilder("user")
+        .leftJoinAndSelect("user.projects", "project")
+        .leftJoinAndSelect("user.assignedTasks", "task")
+        .orderBy("user.id", "ASC")
+        .skip(skip)
+        .take(limit);
 
-    return sendSuccess(res, 200, "Users fetched successfully.", users.map(withoutPassword));
+    if (typeof req.query.name === "string" && req.query.name.trim() !== "") {
+        query.andWhere("LOWER(user.name) LIKE :name", {
+            name: `%${req.query.name.trim().toLowerCase()}%`,
+        });
+    }
+    if (typeof req.query.email === "string" && req.query.email.trim() !== "") {
+        query.andWhere("LOWER(user.email) LIKE :email", {
+            email: `%${req.query.email.trim().toLowerCase()}%`,
+        });
+    }
+
+    const [users, total] = await query.getManyAndCount();
+
+    return sendSuccess(res, 200, "Users fetched successfully.", {
+        items: users.map(withoutPassword),
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
 };
 
 export const getUserById = async (req, res) => {
@@ -84,6 +109,9 @@ export const updateUser = async (req, res) => {
             return sendError(res, 409, "Email is already used.");
         }
     }
+    if (dto.password !== undefined) {
+        dto.password = await hashPassword(dto.password);
+    }
 
     Object.assign(user, dto); // non-destructive update of user entity with the new values from dto
     const savedUser = await userRepository().save(user);
@@ -104,4 +132,3 @@ export const deleteUser = async (req, res) => {
     await userRepository().remove(user);
     return sendSuccess(res, 200, "User deleted successfully.");
 };
-
